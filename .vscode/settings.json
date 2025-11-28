@@ -1,0 +1,28 @@
+{
+  "files.watcherExclude": {
+    "**/node_modules/**": true,
+    "**/android/**": true,
+    "**/ios/**": true,
+    "**/build/**": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/android": true,
+    "**/ios": true,
+    "**/build": true
+  },
+  "typescript.tsserver.maxTsServerMemory": 1024,
+  "eslint.enable": false,
+  "editor.quickSuggestions": { "strings": false },
+
+  "typescript.disableAutomaticTypeAcquisition": true,
+
+  // Reduce file watcher load on macOS
+  "files.useExperimentalFileWatcher": true,
+
+  // Prevent VS Code from suggesting large module imports
+  "javascript.suggest.completeFunctionCalls": false,
+
+  // Optional: improve terminal performance
+  "terminal.integrated.gpuAcceleration": "off"
+}
