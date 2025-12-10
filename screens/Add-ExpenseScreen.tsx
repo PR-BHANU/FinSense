@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   KeyboardAvoidingView,
   StyleSheet,
@@ -10,13 +10,15 @@ import {
   Platform,
   Alert,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
 import { SelectList } from 'react-native-dropdown-select-list';
-import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
+import { launchImageLibrary } from 'react-native-image-picker';
 import TextRecognition from 'react-native-text-recognition';
+import { parseReceipt } from '../scripts/parseRecieptText';
 
 const defaultCategories = [
   'Food & Drinks',
@@ -46,6 +48,7 @@ async function onExpenseClick(
       category,
       description,
       date,
+      createdAt: firestore.FieldValue.serverTimestamp(),
     });
 }
 
@@ -57,74 +60,149 @@ export default function AddExpense({ navigation }: any) {
   const [date, setDate] = useState(new Date());
   const [showPicker, setShowPicker] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [scanning, setScanning] = useState(false);
   const [customCategories, setCustomCategories] = useState<string[]>([]);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [mode, setMode] = useState<'manual' | 'scan'>('manual');
 
+  const isMounted = useRef(true);
+
   useEffect(() => {
+    isMounted.current = true;
     const currentUser = auth().currentUser;
     if (currentUser) setUser(currentUser);
     if (!currentUser) return;
 
-    const unSubscribe = firestore()
+    const unsub = firestore()
       .collection('Users')
       .doc(currentUser.uid)
       .collection('Custom-Categories')
-      .onSnapshot(snapshot => {
-        const Categories = snapshot.docs.map(doc => doc.data().name);
-        setCustomCategories(Categories);
-      });
+      .onSnapshot(
+        snapshot => {
+          const Categories = snapshot.docs
+            .map(doc => doc.data().name)
+            .filter(Boolean);
+          if (isMounted.current) setCustomCategories(Categories);
+        },
+        err => {
+          console.warn('Failed to load custom categories', err);
+        },
+      );
 
-    return () => unSubscribe();
+    return () => {
+      isMounted.current = false;
+      unsub();
+    };
   }, []);
 
-  useEffect(() => {
-    if (mode === 'scan') {
-      (async () => {
-        const result = await launchImageLibrary({
-          mediaType: 'photo',
-          selectionLimit: 1,
-        });
-        console.log('Image: ', result);
-        if (result.didCancel) return;
-        else if (result.errorMessage)
-          return (
-            <View>
-              <Text>{result.errorMessage}</Text>
-            </View>
-          );
-        else if (result.assets) {
-          const ocrText = TextRecognition.recognize(result.assets[0].uri);
-          console.log(ocrText);
-        }
-      })();
-    }
-  }, [mode]);
   const combinedCategories = [
     '+ Add New Category',
     ...customCategories,
     ...defaultCategories,
   ];
 
+  useEffect(() => {
+    if (mode !== 'scan') return;
+
+    let cancelled = false;
+
+    async function runScan() {
+      try {
+        setScanning(true);
+
+        const result = await launchImageLibrary({
+          mediaType: 'photo',
+          selectionLimit: 1,
+        });
+
+        if (cancelled) return;
+
+        if (result.didCancel) {
+          Alert.alert('Cancelled', 'No image selected.');
+          setMode('manual');
+          return;
+        }
+
+        if (result.errorMessage || result.errorCode) {
+          Alert.alert('Error', result.errorMessage || result.errorCode);
+          setMode('manual');
+          return;
+        }
+
+        const asset = result.assets?.[0];
+        if (!asset || !asset.uri) {
+          Alert.alert('Error', 'Invalid image.');
+          setMode('manual');
+          return;
+        }
+
+        const lines = await TextRecognition.recognize(asset.uri);
+
+        if (cancelled) return;
+
+        if (!lines || !lines.length) {
+          Alert.alert('No text found', 'Could not read this receipt.');
+          setMode('manual');
+          return;
+        }
+        console.log('RAW OCR LINES →', JSON.stringify(lines, null, 2));
+
+        const parsed = parseReceipt(lines, combinedCategories);
+
+        if (parsed.amount) setAmount(String(parsed.amount));
+        if (parsed.dateISO) setDate(new Date(parsed.dateISO));
+        if (parsed.merchant) setDescription(parsed.merchant);
+        if (parsed.categoryKeywords[0]) setSelected(parsed.categoryKeywords[0]);
+        console.log('Output: ', parsed);
+
+        Alert.alert('Success', 'Receipt scanned successfully!');
+      } catch (e) {
+        console.log('SCAN ERROR →', e);
+        Alert.alert('Scan Failed', 'Something went wrong during OCR.');
+      } finally {
+        if (!cancelled) {
+          setScanning(false);
+          setMode('manual');
+        }
+      }
+    }
+
+    runScan();
+    return () => {
+      cancelled = true;
+    };
+  }, [mode]);
+
   const onChange = (_event: any, selectedDate?: Date) => {
     setShowPicker(Platform.OS === 'ios');
     if (selectedDate) setDate(selectedDate);
   };
 
-  const handleSave = async () => {
-    if (!user) return;
+  const sanitizeAmountInput = (text: string) => {
+    const cleaned = text.replace(/[^\d.]/g, '');
+    const parts = cleaned.split('.');
+    if (parts.length <= 2) return cleaned;
+    return parts[0] + '.' + parts.slice(1).join('');
+  };
 
-    // Validation
+  const handleSave = async () => {
+    if (!user) {
+      Alert.alert('Not signed in', 'Please sign in to save expenses.');
+      return;
+    }
+
     if (!amount.trim()) {
       Alert.alert('Invalid Input', 'Amount cannot be empty');
       return;
     }
 
-    if (isNaN(Number(amount))) {
-      Alert.alert('Invalid Input', 'Amount must be a number');
+    const numeric = Number(amount);
+    if (isNaN(numeric) || numeric <= 0) {
+      Alert.alert('Invalid Input', 'Amount must be a positive number');
       return;
     }
+
     if (!selected) {
       Alert.alert('Invalid Input', 'Please select a category');
       return;
@@ -132,19 +210,16 @@ export default function AddExpense({ navigation }: any) {
 
     try {
       setLoading(true);
-      await onExpenseClick(user, Number(amount), selected, description, date);
-
+      await onExpenseClick(user, numeric, selected, description, date);
       navigation.navigate('Show-Expense', {
         toastMessage: 'Expense Added Successfully!',
       });
-
-      // Clear form
       setAmount('');
       setSelected('');
       setDescription('');
       setDate(new Date());
     } catch (error) {
-      console.error(error);
+      console.error('Saving expense failed', error);
       Alert.alert('Error', 'Something went wrong while adding the expense.');
     } finally {
       setLoading(false);
@@ -157,18 +232,21 @@ export default function AddExpense({ navigation }: any) {
       return;
     }
     try {
-      if (!user) return;
+      if (!user) {
+        Alert.alert('Not signed in', 'Please sign in to add categories.');
+        return;
+      }
       await firestore()
         .collection('Users')
         .doc(user.uid)
         .collection('Custom-Categories')
-        .add({ name: newCategoryName });
+        .add({ name: newCategoryName.trim() });
 
-      setSelected(newCategoryName);
+      setSelected(newCategoryName.trim());
       setNewCategoryName('');
       setShowCategoryModal(false);
     } catch (err) {
-      console.error(err);
+      console.error('Add category failed', err);
       Alert.alert('Error', 'Could not add category.');
     }
   };
@@ -178,9 +256,13 @@ export default function AddExpense({ navigation }: any) {
       style={Styles.wrapper}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView contentContainerStyle={Styles.scroll}>
+      <ScrollView
+        contentContainerStyle={Styles.scroll}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={Styles.container}>
           <Text style={Styles.header}>Add New Expense</Text>
+
           <View
             style={{
               flexDirection: 'row',
@@ -199,6 +281,7 @@ export default function AddExpense({ navigation }: any) {
                 borderColor: '#e2e8f0',
                 marginRight: 8,
               }}
+              disabled={loading || scanning}
             >
               <Text
                 style={{
@@ -220,6 +303,7 @@ export default function AddExpense({ navigation }: any) {
                 borderWidth: 1,
                 borderColor: '#e2e8f0',
               }}
+              disabled={loading || scanning}
             >
               <Text
                 style={{
@@ -227,17 +311,19 @@ export default function AddExpense({ navigation }: any) {
                   fontWeight: '700',
                 }}
               >
-                Scan
+                {scanning ? 'Scanning...' : 'Scan'}
               </Text>
             </TouchableOpacity>
           </View>
+
           <Text style={Styles.label}>Amount (₹)</Text>
           <TextInput
             placeholder="Enter amount"
             value={amount}
-            onChangeText={setAmount}
-            keyboardType="numeric"
+            onChangeText={t => setAmount(sanitizeAmountInput(t))}
+            keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
             style={Styles.input}
+            returnKeyType="done"
           />
 
           <Text style={Styles.label}>Category</Text>
@@ -250,6 +336,8 @@ export default function AddExpense({ navigation }: any) {
             data={combinedCategories}
             save="value"
             search={false}
+            boxStyles={{ borderRadius: 8 }}
+            inputStyles={{ fontSize: 16 }}
           />
 
           <Text style={Styles.description}>Description</Text>
@@ -259,6 +347,7 @@ export default function AddExpense({ navigation }: any) {
             onChangeText={setDescription}
             style={Styles.input}
             multiline
+            numberOfLines={2}
           />
 
           <Text style={Styles.label}>Date</Text>
@@ -275,6 +364,7 @@ export default function AddExpense({ navigation }: any) {
               mode="date"
               display="default"
               onChange={onChange}
+              maximumDate={new Date()}
             />
           )}
 
@@ -283,14 +373,15 @@ export default function AddExpense({ navigation }: any) {
             onPress={handleSave}
             disabled={loading}
           >
-            <Text style={Styles.saveText}>
-              {loading ? 'Saving...' : 'Save Expense'}
-            </Text>
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={Styles.saveText}>Save Expense</Text>
+            )}
           </TouchableOpacity>
         </View>
       </ScrollView>
 
-      {/* Modal for Adding Category */}
       <Modal
         visible={showCategoryModal}
         transparent
@@ -305,6 +396,7 @@ export default function AddExpense({ navigation }: any) {
               value={newCategoryName}
               onChangeText={setNewCategoryName}
               style={Styles.modalInput}
+              returnKeyType="done"
             />
             <View style={Styles.modalButtons}>
               <TouchableOpacity
@@ -376,11 +468,7 @@ const Styles = StyleSheet.create({
     borderRadius: 12,
     padding: 20,
   },
-  modalHeader: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 15,
-  },
+  modalHeader: { fontSize: 20, fontWeight: 'bold', marginBottom: 15 },
   modalInput: {
     borderWidth: 1,
     borderColor: '#ddd',
@@ -388,10 +476,7 @@ const Styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 20,
   },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
+  modalButtons: { flexDirection: 'row', justifyContent: 'space-between' },
   modalButton: {
     flex: 1,
     padding: 12,

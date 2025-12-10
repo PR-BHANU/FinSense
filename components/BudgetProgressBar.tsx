@@ -270,7 +270,9 @@ export default function BudgetProgressBar({
           </View>
 
           <View style={styles.metaRow}>
-            <Text style={styles.metaText}>{progressValue * 100}% used</Text>
+            <Text style={styles.metaText}>
+              {(progressValue * 100).toFixed(2)}% used
+            </Text>
             <Text style={styles.metaRight}>
               Remaining ₹{budget - totalThisMonth}
             </Text>
