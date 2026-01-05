@@ -9,55 +9,26 @@ import AuthLoadingScreen from '../screens/AuthLoadingScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import AddExpense from '../screens/Add-ExpenseScreen';
 import ShowExpense from '../screens/Show-Expenses';
+import GetStarted from '../screens/GetStarted';
 
 const Stack = createNativeStackNavigator();
 
 export default function AppNavigator() {
   return (
-    <NavigationContainer>
-      <Stack.Navigator
-        initialRouteName="AuthLoading"
-        screenOptions={{
-          headerTitleAlign: 'center',
-        }}
-      >
-        {/* This screen runs first to check if user is logged in */}
-        <Stack.Screen
-          name="AuthLoading"
-          component={AuthLoadingScreen}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="SignIn"
-          component={SignInScreen}
-          options={{ title: 'Sign In', headerShown: false }}
-        />
-        <Stack.Screen
-          name="Login"
-          component={LogInScreen}
-          options={{ title: 'Login', headerShown: false }}
-        />
-        <Stack.Screen
-          name="Dashboard"
-          component={DashboardScreen}
-          options={{ title: 'Dashboard', headerShown: false }}
-        />
-        <Stack.Screen
-          name="Settings"
-          component={SettingsScreen}
-          options={{ title: 'Settings', headerShown: false }}
-        />
-        <Stack.Screen
-          name="Add-Expense"
-          component={AddExpense}
-          options={{ title: 'Add Expense', headerShown: true }}
-        />
-        <Stack.Screen
-          name="Show-Expense"
-          component={ShowExpense}
-          options={{ title: 'Expenses', headerShown: true }}
-        />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <Stack.Navigator
+      initialRouteName="Get-Started"
+      screenOptions={{
+        headerShown: false,
+      }}
+    >
+      <Stack.Screen name="Get-Started" component={GetStarted} />
+      <Stack.Screen name="AuthLoading" component={AuthLoadingScreen} />
+      <Stack.Screen name="SignIn" component={SignInScreen} />
+      <Stack.Screen name="Login" component={LogInScreen} />
+      <Stack.Screen name="Dashboard" component={DashboardScreen} />
+      <Stack.Screen name="Settings" component={SettingsScreen} />
+      <Stack.Screen name="Add-Expense" component={AddExpense} />
+      <Stack.Screen name="Show-Expense" component={ShowExpense} />
+    </Stack.Navigator>
   );
 }

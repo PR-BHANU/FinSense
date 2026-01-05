@@ -17,7 +17,9 @@ import EditExpense from './Edit-Expense';
 import Toast from '../components/Toast';
 import plusImage from '../Assets/Icons/plus.png';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { CirclePlus } from 'lucide-react-native';
+import { CirclePlus, Pencil, Trash } from 'lucide-react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+import { KeyboardAvoidingView } from 'react-native';
 firestore().settings({ persistence: true });
 
 const sortOptions = [
@@ -134,7 +136,6 @@ export default function Expenses({}) {
     const currentUser = auth().currentUser;
     if (currentUser) setUser(currentUser);
     if (!currentUser) return;
-
     const unSubscribe = firestore()
       .collection('Users')
       .doc(currentUser.uid)
@@ -218,7 +219,7 @@ export default function Expenses({}) {
           style={[styles.roundButton, styles.editButton]}
           onPress={() => setEditingExpense(item)}
         >
-          <Text style={styles.hiddenText}>✏️</Text>
+          <Pencil style={styles.hiddenText} />
         </TouchableOpacity>
       </View>
       <View style={[styles.roundButtonContainer, { alignItems: 'flex-end' }]}>
@@ -226,7 +227,7 @@ export default function Expenses({}) {
           style={[styles.roundButton, styles.deleteButton]}
           onPress={() => handleDelete(item)}
         >
-          <Text style={styles.hiddenText}>🗑️</Text>
+          <Trash style={styles.hiddenText} />
         </TouchableOpacity>
       </View>
     </View>
@@ -240,6 +241,11 @@ export default function Expenses({}) {
     <View style={{ flex: 1, backgroundColor: '#f4f5f7', padding: 16 }}>
       <View style={styles.container}>
         <Text style={styles.expensesText}>Expenses</Text>
+        <View style={styles.hintContainer}>
+          <Text style={styles.hintText}>
+            Swipe left to delete · Swipe right to edit
+          </Text>
+        </View>
 
         <View style={styles.filtersContainer}>
           <View style={{ flex: 1, zIndex: 2 }}>
@@ -283,13 +289,17 @@ export default function Expenses({}) {
         <Modal
           visible={!!editingExpense}
           animationType="slide"
-          transparent={true}
+          transparent
           onRequestClose={() => setEditingExpense(null)}
         >
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalContainer, { padding: 0 }]}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.modalOverlay}
+          >
+            <View style={styles.modalContainer}>
               <ScrollView
                 contentContainerStyle={{ padding: 20 }}
+                keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
               >
                 {editingExpense && (
@@ -307,7 +317,7 @@ export default function Expenses({}) {
                 </TouchableOpacity>
               </ScrollView>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
       </View>
 
@@ -415,10 +425,9 @@ const styles = StyleSheet.create({
   modalContainer: {
     backgroundColor: '#fff',
     width: '85%',
-    padding: 20,
     borderRadius: 16,
     elevation: 10,
-    maxHeight: '95%',
+    maxHeight: '85%',
   },
   closeButton: {
     backgroundColor: '#ef4444',
@@ -444,7 +453,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#555',
-    marginBottom: 5,
+    marginBottom: 8,
   },
   dropdownBox: {
     borderColor: '#ddd',
@@ -452,6 +461,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: '#fff',
     paddingHorizontal: 10,
+    marginBottom: 10,
   },
   dropdownList: {
     borderColor: '#ccc',
@@ -478,5 +488,19 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     tintColor: '#fff',
+  },
+  hintContainer: {
+    backgroundColor: '#f1f5f9',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+    alignSelf: 'flex-start',
+  },
+
+  hintText: {
+    fontSize: 13,
+    color: '#475569',
+    fontWeight: '500',
   },
 });

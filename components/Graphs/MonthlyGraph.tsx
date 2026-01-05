@@ -20,11 +20,11 @@ export default function MonthlySpendingGraph({ expenses }: Props) {
 
   useEffect(() => {
     const seedData = async () => {
-      if (__DEV__) {
-        setIsLoading(true);
-        await generateTestExpenses();
-        setIsLoading(false);
-      }
+      // if (__DEV__) {
+      //   setIsLoading(true);
+      //   await generateTestExpenses();
+      //   setIsLoading(false);
+      // }
     };
     seedData();
   }, []);

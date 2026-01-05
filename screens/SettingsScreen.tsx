@@ -8,11 +8,19 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
+import auth from '@react-native-firebase/auth';
 
 interface SettingsScreenProps {
   navigation: any;
 }
 
+async function logout(navigation: any) {
+  await auth().signOut();
+  navigation.reset({
+    index: 0,
+    routes: [{ name: 'Login' }],
+  });
+}
 export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   const [isDarkMode, setIsDarkMode] = useState(false);
 
@@ -43,6 +51,14 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
               : undefined
           }
         />
+        <View>
+          <TouchableOpacity
+            style={styles.logoutButton}
+            onPress={() => logout(navigation)}
+          >
+            <Text style={styles.logoutText}>Log Out</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </ScrollView>
   );
@@ -50,29 +66,47 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
 
 const styles = StyleSheet.create({
   container: {
-    padding: 20,
-    backgroundColor: '#f9f9f9',
     flexGrow: 1,
+    padding: 24,
+    backgroundColor: '#F7F9FC',
   },
+
   backButton: {
-    marginBottom: 20,
+    marginBottom: 24,
   },
+
   backText: {
     fontSize: 16,
-    color: '#007bff',
+    fontWeight: '500',
+    color: '#4A6CF7',
   },
+
   settingItem: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 15,
+    paddingVertical: 16,
     borderBottomWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#E5E7EB',
   },
+
   settingText: {
     fontSize: 16,
+    color: '#1C1C1E',
+    fontWeight: '500',
   },
-  settingValue: {
+
+  logoutButton: {
+    marginTop: 40,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    backgroundColor: '#FEE2E2',
+  },
+
+  logoutText: {
+    color: '#DC2626',
     fontSize: 16,
-    color: '#555',
+    fontWeight: '600',
   },
 });

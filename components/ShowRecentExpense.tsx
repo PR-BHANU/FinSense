@@ -10,6 +10,7 @@ import {
 import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
 import { useNavigation } from '@react-navigation/native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 
 export default function RecentExpensesHorizontal() {
   const navigation = useNavigation();
@@ -30,7 +31,7 @@ export default function RecentExpensesHorizontal() {
           const d = doc.data();
           return {
             id: doc.id,
-            title: d.title || 'Untitled',
+            title: d.title || d.description || 'Untitled',
             amount: d.amount || 0,
             category: d.category || 'Misc',
             date: d.date?.toDate ? d.date.toDate() : new Date(),

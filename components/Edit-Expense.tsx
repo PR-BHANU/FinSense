@@ -198,114 +198,80 @@ export default function EditExpense({ expense, onEditSuccess }) {
 
   return (
     <>
-      <KeyboardAvoidingView
-        style={Styles.wrapper}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      <ScrollView
+        contentContainerStyle={Styles.scroll}
+        keyboardShouldPersistTaps="handled"
       >
-        <ScrollView contentContainerStyle={Styles.scroll}>
-          <View style={Styles.container}>
-            <Text style={Styles.header}>Edit Expense</Text>
+        <View style={Styles.container}>
+          <Text style={Styles.header}>Edit Expense</Text>
 
-            <Text style={Styles.label}>Amount (₹)</Text>
-            <TextInput
-              placeholder="Enter amount"
-              value={amount}
-              onChangeText={setAmount}
-              keyboardType="numeric"
-              style={Styles.input}
+          {/* Amount */}
+          <Text style={Styles.label}>Amount (₹)</Text>
+          <TextInput
+            placeholder="Enter amount"
+            value={amount}
+            onChangeText={setAmount}
+            keyboardType="numeric"
+            style={Styles.input}
+          />
+
+          {/* Category */}
+          <Text style={Styles.label}>Category</Text>
+          <SelectList
+            placeholder="Select category"
+            setSelected={val => {
+              if (val === '+ Add New Category') setShowCategoryModal(true);
+              else setSelected(val);
+            }}
+            data={combinedCategories}
+            save="value"
+            search={false}
+            defaultOption={
+              selected ? { key: selected, value: selected } : undefined
+            }
+          />
+
+          {/* Description */}
+          <Text style={Styles.description}>Description</Text>
+          <TextInput
+            placeholder="Add a short note"
+            value={description}
+            onChangeText={setDescription}
+            style={Styles.input}
+            multiline
+          />
+
+          {/* Date */}
+          <Text style={Styles.label}>Date</Text>
+          <TouchableOpacity
+            style={Styles.input}
+            onPress={() => setShowPicker(true)}
+          >
+            <Text>{date.toLocaleDateString()}</Text>
+          </TouchableOpacity>
+
+          {showPicker && (
+            <DateTimePicker
+              value={date}
+              mode="date"
+              display="default"
+              onChange={onChange}
             />
+          )}
 
-            <Text style={Styles.label}>Category</Text>
-            <SelectList
-              placeholder="Select category"
-              setSelected={val => {
-                if (val === '+ Add New Category') setShowCategoryModal(true);
-                else setSelected(val);
-              }}
-              data={combinedCategories}
-              save="value"
-              search={false}
-              defaultOption={
-                selected
-                  ? { key: selected, value: selected } // ✅ Show currently selected category
-                  : undefined
-              }
-            />
+          <TouchableOpacity
+            style={[Styles.saveButton, loading && { opacity: 0.6 }]}
+            onPress={handleSave}
+            disabled={loading}
+          >
+            <Text style={Styles.saveText}>
+              {loading ? 'Saving...' : 'Save Expense'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
 
-            <Text style={Styles.description}>Description</Text>
-            <TextInput
-              placeholder="Add a short note"
-              value={description}
-              onChangeText={setDescription}
-              style={Styles.input}
-              multiline
-            />
-
-            <Text style={Styles.label}>Date</Text>
-            <TouchableOpacity
-              style={Styles.input}
-              onPress={() => setShowPicker(true)}
-            >
-              <Text>{date.toLocaleDateString()}</Text>
-            </TouchableOpacity>
-
-            {showPicker && (
-              <DateTimePicker
-                value={date}
-                mode="date"
-                display="default"
-                onChange={onChange}
-              />
-            )}
-
-            <TouchableOpacity
-              style={[Styles.saveButton, loading && { opacity: 0.6 }]}
-              onPress={handleSave}
-              disabled={loading}
-            >
-              <Text style={Styles.saveText}>
-                {loading ? 'Saving...' : 'Save Expense'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-
-        {/* Add Category Modal */}
-        <Modal
-          visible={showCategoryModal}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setShowCategoryModal(false)}
-        >
-          <View style={Styles.modalOverlay}>
-            <View style={Styles.modalContainer}>
-              <Text style={Styles.modalHeader}>Add New Category</Text>
-              <TextInput
-                placeholder="Category Name"
-                value={newCategoryName}
-                onChangeText={setNewCategoryName}
-                style={Styles.modalInput}
-              />
-              <View style={Styles.modalButtons}>
-                <TouchableOpacity
-                  onPress={() => setShowCategoryModal(false)}
-                  style={[Styles.modalButton, { backgroundColor: '#ccc' }]}
-                >
-                  <Text>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={handleAddCategory}
-                  style={[Styles.modalButton, { backgroundColor: '#4CAF50' }]}
-                >
-                  <Text style={{ color: '#fff' }}>Add</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-      </KeyboardAvoidingView>
-
-      {/* ✅ Toast */}
+      {/* Toast */}
       <Toast
         message={toastMessage}
         visible={toastVisible}

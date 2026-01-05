@@ -10,6 +10,7 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  useColorScheme,
 } from 'react-native';
 import { firebaseAuth } from '../scripts/firebase';
 import firestore from '@react-native-firebase/firestore';
@@ -19,7 +20,9 @@ import {
   GoogleSigninButton,
 } from '@react-native-google-signin/google-signin';
 import auth from '@react-native-firebase/auth';
-console.log('Rendered: SignInScreen');
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Eye, EyeOff } from 'lucide-react-native';
+import { LightTheme, DarkTheme } from '../scripts/theme';
 
 GoogleSignin.configure({
   webClientId:
@@ -27,27 +30,22 @@ GoogleSignin.configure({
   offlineAccess: true,
 });
 
-// 🔹 Email validation regex
 const validateEmail = (email: string) => {
   const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return regex.test(email);
 };
 
-//google SignIn
 async function signInWithGoogle(navigation: any) {
   try {
     await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
 
     const userInfo = await GoogleSignin.signIn();
-    console.log('Google userInfo:', userInfo);
-
     const idToken = (userInfo as any).idToken || userInfo.data?.idToken;
     if (!idToken) throw new Error('No idToken returned from Google Sign-In');
 
     const googleCredential = auth.GoogleAuthProvider.credential(idToken);
     const userCredential = await auth().signInWithCredential(googleCredential);
 
-    // ✅ Save/update Firestore with UID as doc ID
     await firestore()
       .collection('Users')
       .doc(userCredential.user.uid)
@@ -58,9 +56,7 @@ async function signInWithGoogle(navigation: any) {
           name: userCredential.user.displayName,
           phone: userCredential.user.phoneNumber,
           createdAt: userCredential.user.metadata.creationTime,
-          monthlyBudget: 0,
           currency: 'INR',
-          preferredCategories: [],
           authProvider: userCredential.user.providerId,
           profilePic:
             userCredential.user.photoURL ||
@@ -69,18 +65,14 @@ async function signInWithGoogle(navigation: any) {
         { merge: true },
       );
 
-    Alert.alert('Success ✅', 'Signed in with Google!');
     navigation.navigate('Dashboard');
   } catch (error: any) {
-    if (error.code === statusCodes.SIGN_IN_CANCELLED) {
-      console.log('User cancelled the login flow');
-    } else if (error.code === statusCodes.IN_PROGRESS) {
-      console.log('Sign in is in progress');
-    } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+    if (error.code === statusCodes.SIGN_IN_CANCELLED) return;
+    if (error.code === statusCodes.IN_PROGRESS) return;
+    if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
       Alert.alert('Error', 'Play Services not available or outdated');
     } else {
-      console.error('❌ Google sign-in error:', error);
-      Alert.alert('Error', error.message || 'Google sign-in failed.');
+      Alert.alert('Error', 'Something went wrong, please try again later.');
     }
   }
 }
@@ -92,18 +84,13 @@ async function SignInWithEmail(
   setLoading: (val: boolean) => void,
 ) {
   try {
-    console.log('🔄 Step 1: Starting account creation...');
     const userCredentials = await firebaseAuth.createUserWithEmailAndPassword(
       email,
       password,
     );
-    console.log('✅ Step 1 Complete: Account created');
 
     await userCredentials.user.sendEmailVerification();
-    console.log('✅ Email verification sent');
 
-    // ✅ Save/update Firestore with UID as doc ID
-    console.log('🔄 Step 3: Saving to Firestore...');
     await firestore()
       .collection('Users')
       .doc(userCredentials.user.uid)
@@ -114,9 +101,7 @@ async function SignInWithEmail(
           name: userCredentials.user.displayName,
           phone: userCredentials.user.phoneNumber,
           createdAt: userCredentials.user.metadata.creationTime,
-          monthlyBudget: 0,
           currency: 'INR',
-          preferredCategories: [],
           authProvider: userCredentials.user.providerId,
           profilePic:
             userCredentials.user.photoURL ||
@@ -125,12 +110,8 @@ async function SignInWithEmail(
         { merge: true },
       );
 
-    console.log('✅ Step 3 Complete: Firestore save successful');
-
     return { success: true };
   } catch (err: any) {
-    console.error('❌ Sign in error:', err.code, err.message);
-
     if (err.code === 'auth/email-already-in-use') {
       Alert.alert(
         'Email in Use',
@@ -150,9 +131,13 @@ async function SignInWithEmail(
 }
 
 export default function SignInScreen({ navigation }) {
+  const scheme = useColorScheme();
+  const theme = scheme === 'dark' ? DarkTheme : LightTheme;
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSignIn = async () => {
     if (!email || !password) {
@@ -181,76 +166,112 @@ export default function SignInScreen({ navigation }) {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>Welcome Back!</Text>
-        <Text style={styles.subtitle}>Sign in to continue</Text>
+    <SafeAreaProvider>
+      <KeyboardAvoidingView
+        style={{ flex: 1, backgroundColor: theme.background }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView contentContainerStyle={styles.container}>
+          <Text style={[styles.title, { color: theme.text }]}>
+            Create Your FinSense Account
+          </Text>
+          <Text style={[styles.subtitle, { color: theme.subText }]}>
+            Sign Up to continue
+          </Text>
 
-        <TextInput
-          placeholder="Email"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          style={styles.input}
-        />
-
-        <TextInput
-          placeholder="Password"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          style={styles.input}
-        />
-
-        <TouchableOpacity
-          style={[styles.button, loading && { opacity: 0.7 }]}
-          onPress={handleSignIn}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>Sign In</Text>
-          )}
-        </TouchableOpacity>
-        <View style={styles.separatorContainer}>
-          <View style={styles.line} />
-          <Text style={styles.orText}>OR</Text>
-          <View style={styles.line} />
-        </View>
-
-        <View style={{ alignItems: 'center', marginVertical: 10 }}>
-          <GoogleSigninButton
-            style={{
-              width: 230,
-              height: 48,
-              marginVertical: 10,
-            }}
-            size={GoogleSigninButton.Size.Wide}
-            color={GoogleSigninButton.Color.Dark}
-            onPress={async () => {
-              try {
-                setLoading(true);
-                await signInWithGoogle(navigation);
-              } finally {
-                setLoading(false);
-              }
-            }}
-            disabled={loading}
+          <TextInput
+            placeholder="Email"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            style={[
+              styles.input,
+              {
+                backgroundColor: theme.inputBg,
+                borderColor: theme.border,
+                color: theme.text,
+              },
+            ]}
+            placeholderTextColor={theme.subText}
+            cursorColor={theme.primary}
           />
-        </View>
-        <TouchableOpacity
-          onPress={() => navigation.navigate('Login')}
-          style={styles.linkContainer}
-        >
-          <Text style={styles.linkText}>Already have an account? Login</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </KeyboardAvoidingView>
+
+          <View
+            style={[
+              styles.passwordContainer,
+              {
+                backgroundColor: theme.inputBg,
+                borderColor: theme.border,
+              },
+            ]}
+          >
+            <TextInput
+              placeholder="Password"
+              value={password}
+              autoCapitalize="none"
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
+              style={[styles.passwordInput, { color: theme.text }]}
+              placeholderTextColor={theme.subText}
+              cursorColor={theme.primary}
+            />
+            <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+              {showPassword ? (
+                <Eye size={20} color={theme.subText} />
+              ) : (
+                <EyeOff size={20} color={theme.subText} />
+              )}
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.button, { backgroundColor: theme.primary }]}
+            onPress={handleSignIn}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.buttonText}>Sign In</Text>
+            )}
+          </TouchableOpacity>
+
+          <View style={styles.separatorContainer}>
+            <View style={[styles.line, { backgroundColor: theme.text }]} />
+            <Text style={[styles.orText, { color: theme.subText }]}>OR</Text>
+            <View style={[styles.line, { backgroundColor: theme.text }]} />
+          </View>
+
+          <View style={{ alignItems: 'center', marginVertical: 10 }}>
+            <GoogleSigninButton
+              key={scheme}
+              style={{ width: 230, height: 48, marginVertical: 10 }}
+              size={GoogleSigninButton.Size.Wide}
+              color={GoogleSigninButton.Color.Dark}
+              onPress={async () => {
+                try {
+                  setLoading(true);
+                  await signInWithGoogle(navigation);
+                } finally {
+                  setLoading(false);
+                }
+              }}
+              disabled={loading}
+            />
+          </View>
+
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Login')}
+            style={styles.linkContainer}
+          >
+            <Text style={[styles.linkText, { color: theme.primary }]}>
+              Already have an account? Login
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaProvider>
   );
 }
 
@@ -259,7 +280,6 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     padding: 30,
-    backgroundColor: '#f9f9f9',
   },
   title: {
     fontSize: 32,
@@ -269,20 +289,29 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 16,
-    color: '#555',
     marginBottom: 30,
     textAlign: 'center',
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
     padding: 15,
     borderRadius: 10,
     marginBottom: 20,
-    backgroundColor: '#fff',
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 15,
+    marginBottom: 20,
+  },
+  passwordInput: {
+    flex: 1,
+    paddingVertical: 15,
+    fontSize: 16,
   },
   button: {
-    backgroundColor: '#007bff',
     padding: 15,
     borderRadius: 10,
     alignItems: 'center',
@@ -290,7 +319,7 @@ const styles = StyleSheet.create({
   },
   buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
   linkContainer: { alignItems: 'center' },
-  linkText: { color: '#007bff', fontSize: 14 },
+  linkText: { fontSize: 14 },
   separatorContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -299,11 +328,9 @@ const styles = StyleSheet.create({
   line: {
     flex: 1,
     height: 1,
-    backgroundColor: '#ccc',
   },
   orText: {
     marginHorizontal: 10,
-    color: '#555',
     fontWeight: 'bold',
   },
 });

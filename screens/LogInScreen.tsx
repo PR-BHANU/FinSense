@@ -10,6 +10,7 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  useColorScheme,
 } from 'react-native';
 import { firebaseAuth } from '../scripts/firebase';
 import firestore from '@react-native-firebase/firestore';
@@ -19,7 +20,8 @@ import {
   GoogleSigninButton,
 } from '@react-native-google-signin/google-signin';
 import auth from '@react-native-firebase/auth';
-console.log('Rendered: LogInScreen');
+import { LightTheme, DarkTheme } from '../scripts/theme';
+import { Eye, EyeOff } from 'lucide-react-native';
 
 GoogleSignin.configure({
   webClientId:
@@ -27,7 +29,6 @@ GoogleSignin.configure({
   offlineAccess: true,
 });
 
-//Login with Google
 async function loginWithGoogle(navigation: any) {
   try {
     await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
@@ -39,7 +40,6 @@ async function loginWithGoogle(navigation: any) {
     const googleCredential = auth.GoogleAuthProvider.credential(idToken);
     const userCredential = await auth().signInWithCredential(googleCredential);
 
-    // ✅ Save/update Firestore with UID as doc ID
     await firestore()
       .collection('Users')
       .doc(userCredential.user.uid)
@@ -50,9 +50,7 @@ async function loginWithGoogle(navigation: any) {
           name: userCredential.user.displayName,
           phone: userCredential.user.phoneNumber,
           createdAt: userCredential.user.metadata.creationTime,
-          monthlyBudget: 0,
           currency: 'INR',
-          preferredCategories: [],
           authProvider: userCredential.user.providerId,
           profilePic:
             userCredential.user.photoURL ||
@@ -61,23 +59,18 @@ async function loginWithGoogle(navigation: any) {
         { merge: true },
       );
 
-    Alert.alert('Success ✅', 'Logged in with Google!');
     navigation.navigate('Dashboard');
   } catch (error: any) {
-    if (error.code === statusCodes.SIGN_IN_CANCELLED) {
-      console.log('User cancelled login');
-    } else if (error.code === statusCodes.IN_PROGRESS) {
-      console.log('Login in progress');
-    } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+    if (error.code === statusCodes.SIGN_IN_CANCELLED) return;
+    if (error.code === statusCodes.IN_PROGRESS) return;
+    if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
       Alert.alert('Error', 'Play Services not available or outdated');
     } else {
-      console.error('❌ Google login error:', error);
-      Alert.alert('Error', error.message || 'Google login failed.');
+      Alert.alert('Error', 'Something went wrong, please try again later.');
     }
   }
 }
 
-//LogIn with email
 async function LogInWithEmail(
   email: string,
   password: string,
@@ -92,10 +85,7 @@ async function LogInWithEmail(
 
     if (!userCredentials.user.emailVerified) {
       await userCredentials.user.sendEmailVerification();
-      Alert.alert(
-        'Email Verification',
-        `Verification link sent to ${userCredentials.user.email}`,
-      );
+      Alert.alert('Email Verification', 'Verification link sent.');
     }
 
     navigation.navigate('Dashboard');
@@ -112,7 +102,6 @@ async function LogInWithEmail(
     } else if (err.code === 'auth/wrong-password') {
       Alert.alert('Wrong Password', 'The password you entered is incorrect.');
     } else {
-      console.error('❌ Login error:', err.code, err.message);
       Alert.alert('Error', 'Something went wrong. Please try again.');
     }
   } finally {
@@ -121,12 +110,14 @@ async function LogInWithEmail(
 }
 
 export default function LogInScreen({ navigation }) {
+  const scheme = useColorScheme();
+  const theme = scheme === 'dark' ? DarkTheme : LightTheme;
+  const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleLogin = () => {
-    // Basic validations before hitting Firebase
     if (!email.trim()) {
       Alert.alert('Validation Error', 'Email is required');
       return;
@@ -146,12 +137,14 @@ export default function LogInScreen({ navigation }) {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1 }}
+      style={{ flex: 1, backgroundColor: theme.background }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>Login</Text>
-        <Text style={styles.subtitle}>Enter your credentials</Text>
+        <Text style={[styles.title, { color: theme.text }]}>Login</Text>
+        <Text style={[styles.subtitle, { color: theme.subText }]}>
+          Enter your credentials
+        </Text>
 
         <TextInput
           placeholder="Email"
@@ -159,19 +152,52 @@ export default function LogInScreen({ navigation }) {
           onChangeText={setEmail}
           keyboardType="email-address"
           autoCapitalize="none"
-          style={styles.input}
+          style={[
+            styles.input,
+            {
+              backgroundColor: theme.inputBg,
+              borderColor: theme.border,
+              color: theme.text,
+            },
+          ]}
+          placeholderTextColor={theme.subText}
+          cursorColor={theme.primary}
         />
 
-        <TextInput
-          placeholder="Password"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          style={styles.input}
-        />
+        <View
+          style={[
+            styles.passwordContainer,
+            {
+              backgroundColor: theme.inputBg,
+              borderColor: theme.border,
+            },
+          ]}
+        >
+          <TextInput
+            placeholder="Password"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry={!showPassword}
+            autoCapitalize="none"
+            style={[styles.passwordInput, { color: theme.text }]}
+            placeholderTextColor={theme.subText}
+            cursorColor={theme.primary}
+          />
+
+          <TouchableOpacity
+            onPress={() => setShowPassword(!showPassword)}
+            style={styles.eyeButton}
+          >
+            {showPassword ? (
+              <Eye size={20} color={theme.subText} />
+            ) : (
+              <EyeOff size={20} color={theme.subText} />
+            )}
+          </TouchableOpacity>
+        </View>
 
         <TouchableOpacity
-          style={[styles.button, loading && { opacity: 0.7 }]}
+          style={[styles.button, { backgroundColor: theme.primary }]}
           onPress={handleLogin}
           disabled={loading}
         >
@@ -183,18 +209,15 @@ export default function LogInScreen({ navigation }) {
         </TouchableOpacity>
 
         <View style={styles.separatorContainer}>
-          <View style={styles.line} />
-          <Text style={styles.orText}>OR</Text>
-          <View style={styles.line} />
+          <View style={[styles.line, { backgroundColor: theme.text }]} />
+          <Text style={[styles.orText, { color: theme.subText }]}>OR</Text>
+          <View style={[styles.line, { backgroundColor: theme.text }]} />
         </View>
 
         <View style={{ alignItems: 'center', marginVertical: 10 }}>
           <GoogleSigninButton
-            style={{
-              width: 230,
-              height: 48,
-              marginVertical: 10,
-            }}
+            key={scheme}
+            style={{ width: 230, height: 48, marginVertical: 10 }}
             size={GoogleSigninButton.Size.Wide}
             color={GoogleSigninButton.Color.Dark}
             onPress={async () => {
@@ -213,7 +236,9 @@ export default function LogInScreen({ navigation }) {
           onPress={() => navigation.navigate('SignIn')}
           style={styles.linkContainer}
         >
-          <Text style={styles.linkText}>Don't have an account? Sign Up</Text>
+          <Text style={[styles.linkText, { color: theme.primary }]}>
+            Don't have an account? Sign Up
+          </Text>
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -225,7 +250,6 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     padding: 30,
-    backgroundColor: '#f9f9f9',
   },
   title: {
     fontSize: 32,
@@ -235,20 +259,16 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 16,
-    color: '#555',
     marginBottom: 30,
     textAlign: 'center',
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
     padding: 15,
     borderRadius: 10,
     marginBottom: 20,
-    backgroundColor: '#fff',
   },
   button: {
-    backgroundColor: '#28a745',
     padding: 15,
     borderRadius: 10,
     alignItems: 'center',
@@ -256,7 +276,7 @@ const styles = StyleSheet.create({
   },
   buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
   linkContainer: { alignItems: 'center' },
-  linkText: { color: '#007bff', fontSize: 14 },
+  linkText: { fontSize: 14 },
   separatorContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -265,11 +285,27 @@ const styles = StyleSheet.create({
   line: {
     flex: 1,
     height: 1,
-    backgroundColor: '#ccc',
   },
   orText: {
     marginHorizontal: 10,
-    color: '#555',
     fontWeight: 'bold',
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 15,
+    marginBottom: 20,
+  },
+
+  passwordInput: {
+    flex: 1,
+    paddingVertical: 15,
+    fontSize: 16,
+  },
+
+  eyeButton: {
+    paddingLeft: 10,
   },
 });

@@ -7,7 +7,6 @@ import {
   SafeAreaView,
   ScrollView,
   Platform,
-  KeyboardAvoidingView,
 } from 'react-native';
 import auth from '@react-native-firebase/auth';
 import Header from '../components/Header';
@@ -18,6 +17,7 @@ import Graphs from '../components/Graphs/CategoryGraph';
 import GraphViewer from '../components/Graphs/GraphViewer';
 import RecentExpensesHorizontal from '../components/ShowRecentExpense';
 import BudgetProgressBar from '../components/BudgetProgressBar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 export default function DashboardScreen({ navigation, route }) {
   const [user, setUser] = useState<any>(null);
@@ -42,7 +42,7 @@ export default function DashboardScreen({ navigation, route }) {
 
   useEffect(() => {
     const currentUser = auth().currentUser;
-    if (!currentUser) return;
+    if (!currentUser) navigation.navigate('Get-Started');
     setLoading(true);
     const unsubscribe = firestore()
       .collection('Users')
@@ -83,41 +83,35 @@ export default function DashboardScreen({ navigation, route }) {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <Header profilePic={user.photoURL} navigation={navigation} />
-
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    <SafeAreaProvider style={styles.safe}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
       >
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={{ height: 8 }} />
+        <Header profilePic={user.photoURL} navigation={navigation} />
+        <View style={{ height: 8 }} />
 
-          <View style={styles.sectionWrapper}>
-            <ExpenseSummaryCard navigation={navigation} />
-          </View>
+        <View style={styles.sectionWrapper}>
+          <ExpenseSummaryCard navigation={navigation} />
+        </View>
 
-          <View style={styles.sectionWrapper}>
-            <RecentExpensesHorizontal />
-          </View>
+        <View style={styles.sectionWrapper}>
+          <RecentExpensesHorizontal />
+        </View>
 
-          <View style={styles.progressBar}>
-            <BudgetProgressBar expenses={expenses} navigation={navigation} />
-          </View>
-          <View style={styles.Graph}>
-            <GraphViewer expenses={expenses} />
-          </View>
+        <View style={styles.progressBar}>
+          <BudgetProgressBar expenses={expenses} navigation={navigation} />
+        </View>
+        <View style={styles.Graph}>
+          <GraphViewer expenses={expenses} />
+        </View>
 
-          <View style={{ height: 20 }} />
-        </ScrollView>
-      </KeyboardAvoidingView>
+        <View style={{ height: 20 }} />
+      </ScrollView>
 
       <Toast message={toastMessage} visible={toastVisible} onHide={hideToast} />
-    </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 
@@ -132,7 +126,7 @@ const styles = StyleSheet.create({
   },
 
   scrollContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 1,
     paddingBottom: 60,
   },
 

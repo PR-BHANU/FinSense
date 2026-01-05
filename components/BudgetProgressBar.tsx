@@ -15,6 +15,7 @@ import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
 import * as progress from 'react-native-progress';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 
 interface Expense {
   id: string;
@@ -133,7 +134,7 @@ export default function BudgetProgressBar({
     setProgressValue(clamped);
   }, [budget, totalThisMonth]);
 
-  if (!budget) {
+  if (budget === null || budget === undefined || budget == 0) {
     return (
       <View
         style={{
@@ -185,6 +186,7 @@ export default function BudgetProgressBar({
                 onChangeText={setDraft}
                 placeholder="e.g. 10000"
                 keyboardType="numeric"
+                placeholderTextColor="grey"
                 style={styles.input}
               />
 
@@ -214,117 +216,124 @@ export default function BudgetProgressBar({
 
   return (
     <SafeAreaView style={styles.safe}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.container}
-      >
-        <View style={styles.card} onLayout={onCardLayout}>
-          {/* Top Row */}
-          <View style={styles.topRow}>
-            <View>
-              <Text style={styles.label}>Monthly Budget</Text>
-              <Text style={styles.amount}>₹{budget}</Text>
-            </View>
-            <View style={styles.right}>
-              <Text style={styles.small}>Spent</Text>
-              <Text style={styles.smallAmount}>₹{totalThisMonth}</Text>
-
-              {/* open modal from main card too */}
-              <TouchableOpacity
-                onPress={openEditor}
-                style={{
-                  marginTop: 8,
-                  backgroundColor: '#2563eb',
-                  paddingHorizontal: 10,
-                  paddingVertical: 6,
-                  borderRadius: 8,
-                }}
-              >
-                <Text style={{ color: '#fff', fontWeight: '700' }}>Edit</Text>
-              </TouchableOpacity>
-            </View>
+      <View style={styles.card} onLayout={onCardLayout}>
+        {/* Top Row */}
+        <View style={styles.topRow}>
+          <View>
+            <Text style={styles.label}>Monthly Budget</Text>
+            <Text style={styles.amount}>₹{budget}</Text>
           </View>
+          <View style={styles.right}>
+            <Text style={styles.small}>Spent</Text>
+            <Text style={styles.smallAmount}>₹{totalThisMonth}</Text>
 
-          <View
-            style={styles.barWrapper}
-            onLayout={e => {
-              const w = e.nativeEvent.layout.width;
-              // store the inner width (this is same place you already read onCardLayout)
-              setContainerWidth(w);
-            }}
-          >
-            <progress.Bar
-              progress={Math.max(0, Math.min(1, Number(progressValue) || 0))} // guaranteed 0..1
-              width={
-                containerWidth
-                  ? containerWidth
-                  : Math.round(SCREEN_WIDTH * 0.88)
-              } // explicit number
-              height={14}
-              borderRadius={999}
-              color="#2563eb"
-              unfilledColor="#eef2ff"
-              borderWidth={0}
-              animated={true}
-            />
-          </View>
-
-          <View style={styles.metaRow}>
-            <Text style={styles.metaText}>
-              {(progressValue * 100).toFixed(2)}% used
-            </Text>
-            <Text style={styles.metaRight}>
-              Remaining ₹{budget - totalThisMonth}
-            </Text>
+            {/* open modal from main card too */}
+            <TouchableOpacity
+              onPress={openEditor}
+              style={{
+                marginTop: 8,
+                backgroundColor: '#2563eb',
+                paddingHorizontal: 10,
+                paddingVertical: 6,
+                borderRadius: 8,
+              }}
+            >
+              <Text style={{ color: '#fff', fontWeight: '700' }}>Edit</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
-        <Modal
-          visible={editing}
-          transparent
-          animationType="slide"
-          onRequestClose={handleCancelDraft}
+        <View
+          style={styles.barWrapper}
+          onLayout={e => {
+            const w = e.nativeEvent.layout.width;
+            // store the inner width (this is same place you already read onCardLayout)
+            setContainerWidth(w);
+          }}
         >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modal}>
-              <Text style={styles.modalTitle}>Edit Monthly Budget</Text>
+          <progress.Bar
+            progress={Math.max(0, Math.min(1, Number(progressValue) || 0))} // guaranteed 0..1
+            width={
+              containerWidth ? containerWidth : Math.round(SCREEN_WIDTH * 0.88)
+            } // explicit number
+            height={14}
+            borderRadius={999}
+            color="#2563eb"
+            unfilledColor="#eef2ff"
+            borderWidth={0}
+            animated={true}
+          />
+        </View>
 
-              <TextInput
-                value={draft}
-                onChangeText={setDraft}
-                placeholder="e.g. 10000"
-                keyboardType="numeric"
-                style={styles.input}
-              />
+        <View style={styles.metaRow}>
+          <Text style={styles.metaText}>
+            {(progressValue * 100).toFixed(2)}% used
+          </Text>
+          <Text style={styles.metaRight}>
+            Remaining ₹{budget - totalThisMonth}
+          </Text>
+        </View>
+      </View>
 
-              <View style={{ flexDirection: 'row', marginTop: 12 }}>
-                <TouchableOpacity
-                  style={[styles.modalBtn, { backgroundColor: '#eee' }]}
-                  onPress={handleCancelDraft}
-                >
-                  <Text>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.modalBtn,
-                    { backgroundColor: '#2563eb', marginLeft: 10 },
-                  ]}
-                  onPress={handleSaveDraft}
-                >
-                  <Text style={{ color: '#fff', fontWeight: '700' }}>Save</Text>
-                </TouchableOpacity>
+      <Modal
+        visible={editing}
+        transparent
+        animationType="slide"
+        onRequestClose={handleCancelDraft}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.container}
+        >
+          <KeyboardAwareScrollView
+            enableOnAndroid
+            extraScrollHeight={20}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.modalOverlay}>
+              <View style={styles.modal}>
+                <Text style={styles.modalTitle}>Edit Monthly Budget</Text>
+
+                <TextInput
+                  value={draft}
+                  onChangeText={setDraft}
+                  placeholder="e.g. 10000"
+                  keyboardType="numeric"
+                  placeholderTextColor="grey"
+                  style={styles.input}
+                />
+
+                <View style={{ flexDirection: 'row', marginTop: 12 }}>
+                  <TouchableOpacity
+                    style={[styles.modalBtn, { backgroundColor: '#eee' }]}
+                    onPress={handleCancelDraft}
+                  >
+                    <Text>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.modalBtn,
+                      { backgroundColor: '#2563eb', marginLeft: 10 },
+                    ]}
+                    onPress={handleSaveDraft}
+                  >
+                    <Text style={{ color: '#fff', fontWeight: '700' }}>
+                      Save
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
-          </View>
-        </Modal>
-      </KeyboardAvoidingView>
+          </KeyboardAwareScrollView>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
 const styles = StyleSheet.create({
-  safe: { flex: 0, backgroundColor: 'transparent' },
+  safe: { flex: 1, backgroundColor: 'transparent' },
   container: {
-    flex: 0,
+    flex: 1,
     paddingHorizontal: 0,
     justifyContent: 'center',
   },

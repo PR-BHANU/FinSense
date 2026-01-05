@@ -25,6 +25,7 @@ import {
   setVoiceCallbacks,
   clearVoiceCallbacks,
 } from '../Services/VoiceMount';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 
 async function requestMicrophonePermission() {
   if (Platform.OS !== 'android') return true;
@@ -208,12 +209,6 @@ export default function AddExpense({ navigation }: any) {
       if (parsed.description) setDescription(parsed.description);
 
       setState('Manual');
-
-      Alert.alert(
-        'Voice Input Detected',
-        detectedInfo || 'Processing your input...',
-        [{ text: 'OK' }],
-      );
     } else {
       Alert.alert(
         'Unable to parse',
@@ -384,173 +379,172 @@ export default function AddExpense({ navigation }: any) {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={Styles.wrapper}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    <KeyboardAwareScrollView
+      style={{ flex: 1, backgroundColor: '#f9f9f9' }}
+      contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
+      enableOnAndroid
+      extraScrollHeight={24}
+      keyboardShouldPersistTaps="handled"
     >
-      <ScrollView contentContainerStyle={Styles.scroll}>
-        <View style={Styles.container}>
-          <Text style={Styles.header}>Add New Expense</Text>
+      <Text style={Styles.header}>Add New Expense</Text>
 
-          <View style={Styles.mode}>
-            <TouchableOpacity
-              style={[
-                Styles.modeButton,
-                state === 'Manual' && Styles.modeActive,
-              ]}
-              onPress={() => setState('Manual')}
-            >
-              <Text
-                style={[
-                  Styles.modeText,
-                  state === 'Manual' && Styles.modeTextActive,
-                ]}
-              >
-                Manual
-              </Text>
-            </TouchableOpacity>
+      {/* MODE SWITCH */}
+      <View style={Styles.mode}>
+        <TouchableOpacity
+          style={[Styles.modeButton, state === 'Manual' && Styles.modeActive]}
+          onPress={() => setState('Manual')}
+        >
+          <Text
+            style={[
+              Styles.modeText,
+              state === 'Manual' && Styles.modeTextActive,
+            ]}
+          >
+            Manual
+          </Text>
+        </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[
-                Styles.modeButton,
-                state === 'Voice' && Styles.modeActive,
-              ]}
-              onPress={() => setState('Voice')}
-            >
-              <Text
-                style={[
-                  Styles.modeText,
-                  state === 'Voice' && Styles.modeTextActive,
-                ]}
-              >
-                Voice
-              </Text>
-            </TouchableOpacity>
+        <TouchableOpacity
+          style={[Styles.modeButton, state === 'Voice' && Styles.modeActive]}
+          onPress={() => setState('Voice')}
+        >
+          <Text
+            style={[
+              Styles.modeText,
+              state === 'Voice' && Styles.modeTextActive,
+            ]}
+          >
+            Voice
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* VOICE MODE */}
+      {state === 'Voice' && (
+        <View style={Styles.voiceCard}>
+          <View style={Styles.voiceIcon}>
+            <Mic style={Styles.voiceEmoji} />
           </View>
 
-          {state === 'Voice' && (
-            <View style={Styles.voiceCard}>
-              <View style={Styles.voiceIcon}>
-                <Mic style={Styles.voiceEmoji} />
-              </View>
+          <Text style={Styles.voiceTitle}>Voice Input</Text>
+          <Text style={Styles.voiceSubtitle}>
+            Say: "I spent 500 rupees on food"
+          </Text>
 
-              <Text style={Styles.voiceTitle}>Voice Input</Text>
-              <Text style={Styles.voiceSubtitle}>
-                Say: "I spent 500 rupees on food"
-              </Text>
-
-              {transcription && (
-                <View style={Styles.transcriptionBox}>
-                  <Text style={Styles.transcriptionLabel}>You said:</Text>
-                  <Text style={Styles.transcriptionText}>{transcription}</Text>
-                </View>
-              )}
-
-              {!isListening && (
-                <TouchableOpacity
-                  style={Styles.voiceButtonOff}
-                  onPress={onStartListening}
-                >
-                  <Text style={Styles.voiceButtonText}>Start Listening</Text>
-                </TouchableOpacity>
-              )}
-
-              {isListening && (
-                <TouchableOpacity
-                  style={Styles.voiceButtonOn}
-                  onPress={onStopListening}
-                >
-                  <Text style={Styles.voiceButtonText}>Stop Listening</Text>
-                </TouchableOpacity>
-              )}
+          {transcription && (
+            <View style={Styles.transcriptionBox}>
+              <Text style={Styles.transcriptionLabel}>You said:</Text>
+              <Text style={Styles.transcriptionText}>{transcription}</Text>
             </View>
           )}
 
-          {state === 'Manual' && (
-            <View>
-              <Text style={Styles.label}>Amount (₹)</Text>
-              <TextInput
-                placeholder="Enter amount"
-                value={amount}
-                onChangeText={t => setAmount(sanitizeAmountInput(t))}
-                placeholderTextColor="grey"
-                keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
-                style={Styles.input}
-              />
-
-              <Text style={Styles.label}>Category</Text>
-              <SelectList
-                placeholder="Select category"
-                setSelected={(val: string) => {
-                  if (val === '+ Add New Category') setShowCategoryModal(true);
-                  else setSelected(val);
-                }}
-                data={combinedCategories}
-                save="key"
-                search={false}
-                boxStyles={{ borderRadius: 12 }}
-                inputStyles={{ fontSize: 16 }}
-              />
-
-              <Text style={Styles.description}>Description</Text>
-              <TextInput
-                placeholder="Add a short note"
-                value={description}
-                onChangeText={setDescription}
-                placeholderTextColor="grey"
-                style={Styles.input}
-                multiline
-              />
-
-              <Text style={Styles.label}>Date</Text>
-              <TouchableOpacity
-                style={Styles.input}
-                onPress={() => setShowPicker(true)}
-              >
-                <Text>{date.toLocaleDateString()}</Text>
-              </TouchableOpacity>
-
-              {showPicker && (
-                <DateTimePicker
-                  value={date}
-                  mode="date"
-                  onChange={onChange}
-                  maximumDate={new Date()}
-                />
-              )}
-
-              <TouchableOpacity
-                style={[Styles.saveButton, loading && { opacity: 0.6 }]}
-                onPress={handleSave}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={Styles.saveText}>Save Expense</Text>
-                )}
-              </TouchableOpacity>
-            </View>
+          {!isListening ? (
+            <TouchableOpacity
+              style={Styles.voiceButtonOff}
+              onPress={onStartListening}
+            >
+              <Text style={Styles.voiceButtonText}>Start Listening</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={Styles.voiceButtonOn}
+              onPress={onStopListening}
+            >
+              <Text style={Styles.voiceButtonText}>Stop Listening</Text>
+            </TouchableOpacity>
           )}
         </View>
-      </ScrollView>
+      )}
 
+      {/* MANUAL MODE */}
+      {state === 'Manual' && (
+        <>
+          <Text style={Styles.label}>Amount (₹)</Text>
+          <TextInput
+            value={amount}
+            onChangeText={t => setAmount(sanitizeAmountInput(t))}
+            keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
+            placeholder="Enter amount"
+            placeholderTextColor="grey"
+            style={Styles.input}
+          />
+
+          <Text style={Styles.label}>Category</Text>
+          <SelectList
+            placeholder="Select category"
+            setSelected={(val: string) => {
+              if (val === '+ Add New Category') setShowCategoryModal(true);
+              else setSelected(val);
+            }}
+            data={combinedCategories}
+            save="key"
+            search={false}
+            boxStyles={{ borderRadius: 12 }}
+            inputStyles={{ fontSize: 16 }}
+          />
+
+          <Text style={Styles.description}>Description</Text>
+          <TextInput
+            value={description}
+            onChangeText={setDescription}
+            placeholder="Add a short note"
+            placeholderTextColor="grey"
+            multiline
+            style={Styles.input}
+          />
+
+          <Text style={Styles.label}>Date</Text>
+          <TouchableOpacity
+            style={Styles.input}
+            onPress={() => setShowPicker(true)}
+          >
+            <Text>{date.toLocaleDateString()}</Text>
+          </TouchableOpacity>
+
+          {showPicker && (
+            <DateTimePicker
+              value={date}
+              mode="date"
+              onChange={onChange}
+              maximumDate={new Date()}
+            />
+          )}
+
+          <TouchableOpacity
+            style={[Styles.saveButton, loading && { opacity: 0.6 }]}
+            onPress={handleSave}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={Styles.saveText}>Save Expense</Text>
+            )}
+          </TouchableOpacity>
+        </>
+      )}
+
+      {/* CATEGORY MODAL */}
       <Modal
         visible={showCategoryModal}
         transparent
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setShowCategoryModal(false)}
       >
-        <View style={Styles.modalOverlay}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={Styles.modalOverlay}
+        >
           <View style={Styles.modalContent}>
             <Text style={Styles.modalTitle}>Add New Category</Text>
 
             <TextInput
-              placeholder="Enter category name"
               value={newCategoryName}
               onChangeText={setNewCategoryName}
-              style={Styles.modalInput}
+              placeholder="Enter category name"
               placeholderTextColor="#999"
+              style={Styles.modalInput}
+              autoFocus
             />
 
             <View style={Styles.modalButtons}>
@@ -574,9 +568,9 @@ export default function AddExpense({ navigation }: any) {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
-    </KeyboardAvoidingView>
+    </KeyboardAwareScrollView>
   );
 }
 
@@ -732,6 +726,7 @@ const Styles = StyleSheet.create({
     padding: 24,
     width: '85%',
     maxWidth: 400,
+    alignSelf: 'center',
   },
   modalTitle: {
     fontSize: 20,
