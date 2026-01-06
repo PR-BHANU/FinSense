@@ -4,8 +4,9 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
+  useColorScheme,
+  StatusBar,
   Platform,
 } from 'react-native';
 import auth from '@react-native-firebase/auth';
@@ -13,18 +14,20 @@ import Header from '../components/Header';
 import firestore from '@react-native-firebase/firestore';
 import Toast from '../components/Toast';
 import ExpenseSummaryCard from '../components/ExpenseSummary';
-import Graphs from '../components/Graphs/CategoryGraph';
 import GraphViewer from '../components/Graphs/GraphViewer';
 import RecentExpensesHorizontal from '../components/ShowRecentExpense';
 import BudgetProgressBar from '../components/BudgetProgressBar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { DarkTheme, LightTheme } from '../scripts/theme';
+import { OneSignal, LogLevel } from 'react-native-onesignal';
 
 export default function DashboardScreen({ navigation, route }) {
   const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [expenses, setExpenses] = useState<any[]>([]);
+  const scheme = useColorScheme();
+  const theme = scheme === 'dark' ? DarkTheme : LightTheme;
 
   const hideToast = useCallback(() => setToastVisible(false), []);
 
@@ -42,19 +45,14 @@ export default function DashboardScreen({ navigation, route }) {
 
   useEffect(() => {
     const currentUser = auth().currentUser;
-    if (!currentUser) navigation.navigate('Get-Started');
-    setLoading(true);
+    if (!currentUser) return;
+
     const unsubscribe = firestore()
       .collection('Users')
       .doc(currentUser.uid)
       .collection('Expenses')
       .orderBy('date', 'desc')
       .onSnapshot(snapshot => {
-        if (snapshot.empty) {
-          setExpenses([]);
-          setLoading(false);
-          return;
-        }
         const list = snapshot.docs.map(doc => {
           const data = doc.data();
           return {
@@ -62,77 +60,71 @@ export default function DashboardScreen({ navigation, route }) {
             title: data.title || data.description || 'Untitled',
             amount: data.amount || 0,
             category: data.category || 'Miscellaneous',
-            date: data.date?.toDate
-              ? data.date.toDate()
-              : new Date(data.date || Date.now()),
+            date: data.date?.toDate ? data.date.toDate() : new Date(),
           };
         });
         setExpenses(list);
-        setLoading(false);
       });
+
     return () => unsubscribe();
+  }, []);
+  useEffect(() => {
+    const user = auth().currentUser;
+    if (!user) return;
+
+    OneSignal.User.pushSubscription.getTokenAsync().then(token => {
+      if (!token) return;
+
+      firestore()
+        .collection('users')
+        .doc(user.uid)
+        .set({ fcmToken: token }, { merge: true });
+    });
   }, []);
 
   if (!user) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007bff" />
-        <Text>Loading user...</Text>
+      <View
+        style={[styles.loadingContainer, { backgroundColor: theme.background }]}
+      >
+        <ActivityIndicator size="large" color={theme.primary} />
+        <Text style={{ color: theme.subText }}>Loading user...</Text>
       </View>
     );
   }
 
   return (
-    <SafeAreaProvider style={styles.safe}>
+    <View style={[styles.safe, { backgroundColor: theme.background }]}>
+      <Header profilePic={user.photoURL} navigation={navigation} />
+
       <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
       >
-        <Header profilePic={user.photoURL} navigation={navigation} />
-        <View style={{ height: 8 }} />
+        <ExpenseSummaryCard navigation={navigation} />
 
-        <View style={styles.sectionWrapper}>
-          <ExpenseSummaryCard navigation={navigation} />
-        </View>
-
-        <View style={styles.sectionWrapper}>
-          <RecentExpensesHorizontal />
-        </View>
-
-        <View style={styles.progressBar}>
-          <BudgetProgressBar expenses={expenses} navigation={navigation} />
-        </View>
-        <View style={styles.Graph}>
-          <GraphViewer expenses={expenses} />
-        </View>
-
-        <View style={{ height: 20 }} />
+        <RecentExpensesHorizontal />
+        <BudgetProgressBar expenses={expenses} navigation={navigation} />
+        <GraphViewer expenses={expenses} />
       </ScrollView>
 
       <Toast message={toastMessage} visible={toastVisible} onHide={hideToast} />
-    </SafeAreaProvider>
+    </View>
   );
 }
-
 const styles = StyleSheet.create({
   safe: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-  },
-
-  scroll: {
     flex: 1,
   },
 
   scrollContent: {
-    paddingHorizontal: 1,
-    paddingBottom: 60,
+    paddingTop: 78 + (Platform.OS === 'android' ? 24 : 0),
+    paddingBottom: 90,
   },
 
-  sectionWrapper: {
-    width: '100%',
-    marginBottom: 20,
+  progressBarContainer: {
+    marginBottom: 24,
+    paddingHorizontal: 10,
   },
 
   loadingContainer: {
@@ -140,10 +132,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  Graph: {
-    width: '100%',
-    paddingTop: 5,
-    marginBottom: 20,
-  },
-  progressBar: {},
 });

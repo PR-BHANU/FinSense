@@ -7,13 +7,15 @@ import {
   TouchableOpacity,
   Platform,
   ScrollView,
+  useColorScheme,
 } from 'react-native';
 import { PieChart } from 'react-native-gifted-charts';
 import MonthPicker from 'react-native-month-year-picker';
 import { Calendar } from 'lucide-react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import { LightTheme, DarkTheme } from '../../scripts/theme';
 
-const screenWidth = Dimensions.get('window').width;
+const { width } = Dimensions.get('window');
 
 interface Expense {
   id: string;
@@ -23,22 +25,24 @@ interface Expense {
   date: Date;
 }
 
-interface GraphsProps {
-  expenses: Expense[];
-}
+export default function CategoryGraph({ expenses }: { expenses: Expense[] }) {
+  const scheme = useColorScheme();
+  const theme = scheme === 'dark' ? DarkTheme : LightTheme;
 
-export default function CategoryGraph({ expenses }: GraphsProps) {
+  const gradientColors =
+    scheme === 'dark' ? ['#020617', '#020617'] : ['#ffffff', '#f8fafc'];
+
   const [showPicker, setShowPicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const now = new Date();
 
-  const handleMonthChange = (_: any, date?: Date) => {
+  const onMonthChange = (_: any, date?: Date) => {
     if (Platform.OS === 'android') setShowPicker(false);
     if (date) setSelectedDate(date);
   };
 
   const categoryData = useMemo(() => {
-    const filtered = (expenses ?? []).filter(e => {
+    const filtered = expenses.filter(e => {
       const d = new Date(e.date);
       return (
         d.getMonth() === selectedDate.getMonth() &&
@@ -53,73 +57,95 @@ export default function CategoryGraph({ expenses }: GraphsProps) {
     });
 
     const totalAmount = Object.values(totals).reduce((a, b) => a + b, 0);
-    const colors = [
-      '#3b82f6',
-      '#f43f5e',
-      '#f59e0b',
-      '#10b981',
-      '#8b5cf6',
-      '#ec4899',
-      '#14b8a6',
-    ];
+    if (!totalAmount) return [];
 
-    return Object.keys(totals).map((cat, i) => {
-      const percentage = (totals[cat] / totalAmount) * 100;
-      const formattedPercentage =
-        percentage < 0.1 && percentage > 0 ? '<0.1' : percentage.toFixed(1);
+    const colors =
+      scheme === 'dark'
+        ? [
+            '#60a5fa',
+            '#fb7185',
+            '#fbbf24',
+            '#34d399',
+            '#a78bfa',
+            '#f472b6',
+            '#22d3ee',
+          ]
+        : [
+            '#2563eb',
+            '#f43f5e',
+            '#f59e0b',
+            '#10b981',
+            '#8b5cf6',
+            '#ec4899',
+            '#14b8a6',
+          ];
 
+    return Object.entries(totals).map(([category, value], i) => {
+      const pct = (value / totalAmount) * 100;
       return {
-        value: totals[cat],
+        value,
         color: colors[i % colors.length],
-        text:
-          parseFloat(formattedPercentage) >= 5 ? `${formattedPercentage}%` : '',
-        category: cat,
-        percentage: formattedPercentage,
+        text: pct >= 6 ? `${pct.toFixed(0)}%` : '',
+        category,
+        percentage: pct.toFixed(1),
       };
     });
-  }, [expenses, selectedDate]);
+  }, [expenses, selectedDate, scheme]);
 
-  if (!categoryData.length)
+  if (!categoryData.length) {
     return (
-      <View style={styles.emptyContainer}>
-        <TouchableOpacity onPress={() => setShowPicker(true)}>
-          <Text style={styles.monthLabel}>
+      <View style={styles.emptyWrap}>
+        <TouchableOpacity
+          onPress={() => setShowPicker(true)}
+          style={[styles.datePill, { backgroundColor: theme.inputBg }]}
+        >
+          <Calendar size={16} color={theme.primary} />
+          <Text style={[styles.monthText, { color: theme.primary }]}>
             {selectedDate.toLocaleString('default', {
               month: 'long',
               year: 'numeric',
             })}
           </Text>
         </TouchableOpacity>
-        <Text style={styles.emptyText}>No expenses recorded 💤</Text>
+
+        <Text style={[styles.emptyTitle, { color: theme.text }]}>
+          No expenses yet
+        </Text>
+        <Text style={[styles.emptySub, { color: theme.subText }]}>
+          Start tracking to see insights here
+        </Text>
+
         {showPicker && (
           <MonthPicker
-            onChange={handleMonthChange}
             value={selectedDate}
+            onChange={onMonthChange}
             maximumDate={now}
           />
         )}
       </View>
     );
+  }
 
   return (
     <ScrollView
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={styles.scrollContent}
+      contentContainerStyle={{ alignItems: 'center' }}
     >
       <LinearGradient
-        colors={['#ffffff', '#f8fafc']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.card}
+        colors={gradientColors}
+        style={[styles.card, { backgroundColor: theme.card }]}
       >
-        <View style={styles.headerRow}>
-          <Text style={styles.title}>Spending by Category</Text>
+        <View style={styles.header}>
+          <Text style={[styles.title, { color: theme.text }]}>
+            Spending by Category
+          </Text>
+
           <TouchableOpacity
             onPress={() => setShowPicker(true)}
-            style={styles.dateSelector}
+            style={[styles.datePill, { backgroundColor: theme.inputBg }]}
           >
-            <Calendar size={18} color="#2563eb" />
-            <Text style={styles.monthLabel}>
+            <Calendar size={16} color={theme.primary} />
+            <Text style={[styles.monthText, { color: theme.primary }]}>
               {selectedDate.toLocaleString('default', {
                 month: 'short',
                 year: 'numeric',
@@ -128,7 +154,7 @@ export default function CategoryGraph({ expenses }: GraphsProps) {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.chartWrapper}>
+        <View style={styles.chartCenter}>
           <PieChart
             data={categoryData.map(({ value, color, text }) => ({
               value,
@@ -136,36 +162,39 @@ export default function CategoryGraph({ expenses }: GraphsProps) {
               text,
             }))}
             donut
-            innerRadius={75}
-            radius={120}
+            innerRadius={72}
+            radius={118}
             showText
             textColor="#fff"
             textSize={12}
+            backgroundColor={theme.card}
             isAnimated
-            showTextBackground={false}
+            animationDuration={700}
             centerLabelComponent={() => (
               <View>
-                <Text style={styles.centerLabel}>
+                <Text style={[styles.total, { color: theme.text }]}>
                   ₹
                   {categoryData
-                    .reduce((sum, item) => sum + item.value, 0)
+                    .reduce((s, i) => s + i.value, 0)
                     .toLocaleString()}
                 </Text>
-                <Text style={styles.centerSub}>Total</Text>
+                <Text style={[styles.totalSub, { color: theme.subText }]}>
+                  Total spent
+                </Text>
               </View>
             )}
           />
         </View>
 
-        <View style={styles.legendContainer}>
-          {categoryData.map((item, index) => (
-            <View key={index} style={styles.legendItem}>
-              <View
-                style={[styles.colorDot, { backgroundColor: item.color }]}
-              />
-              <Text style={styles.legendText}>
-                {item.category}{' '}
-                <Text style={styles.legendAmount}>— {item.percentage}%</Text>
+        <View style={[styles.legendBox, { borderTopColor: theme.border }]}>
+          {categoryData.map((item, i) => (
+            <View key={i} style={styles.legendRow}>
+              <View style={[styles.dot, { backgroundColor: item.color }]} />
+              <Text style={[styles.legendText, { color: theme.text }]}>
+                {item.category}
+              </Text>
+              <Text style={[styles.legendPct, { color: theme.subText }]}>
+                {item.percentage}%
               </Text>
             </View>
           ))}
@@ -173,8 +202,8 @@ export default function CategoryGraph({ expenses }: GraphsProps) {
 
         {showPicker && (
           <MonthPicker
-            onChange={handleMonthChange}
             value={selectedDate}
+            onChange={onMonthChange}
             maximumDate={now}
           />
         )}
@@ -184,100 +213,105 @@ export default function CategoryGraph({ expenses }: GraphsProps) {
 }
 
 const styles = StyleSheet.create({
-  scrollContent: {
-    flexGrow: 1,
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    paddingVertical: 8,
-  },
   card: {
-    borderRadius: 22,
+    width: 325,
+    borderRadius: 24,
     padding: 22,
     marginVertical: 16,
-    width: Math.min(screenWidth * 0.94, 760),
-    alignItems: 'center',
     shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
     elevation: 6,
   },
-  headerRow: {
+
+  header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    width: '100%',
-    marginBottom: 10,
+    marginBottom: 12,
   },
-  dateSelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#eff6ff',
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 10,
-  },
-  monthLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1d4ed8',
-    marginLeft: 6,
-  },
+
   title: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#0f172a',
   },
-  chartWrapper: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 14,
-  },
-  legendContainer: {
-    marginTop: 14,
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-    paddingTop: 12,
-    width: '100%',
-  },
-  legendItem: {
+
+  datePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 14,
   },
-  colorDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 10,
+
+  monthText: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginLeft: 6,
   },
-  legendText: {
-    fontSize: 14,
-    color: '#334155',
-  },
-  legendAmount: {
-    color: '#64748b',
-    fontWeight: '500',
-  },
-  centerLabel: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#111827',
-    textAlign: 'center',
-  },
-  centerSub: {
-    fontSize: 12,
-    color: '#6b7280',
-    textAlign: 'center',
-  },
-  emptyContainer: {
+
+  chartCenter: {
+    width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 40,
   },
-  emptyText: {
-    color: '#6b7280',
+
+  total: {
+    fontSize: 24,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+
+  totalSub: {
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 2,
+  },
+
+  legendBox: {
+    marginTop: 18,
+    paddingTop: 14,
+    borderTopWidth: 1,
+  },
+
+  legendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+
+  dot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 10,
+  },
+
+  legendText: {
+    flex: 1,
     fontSize: 14,
-    marginTop: 10,
+    fontWeight: '500',
+  },
+
+  legendPct: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+
+  emptyWrap: {
+    alignItems: 'center',
+    paddingVertical: 48,
+  },
+
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginTop: 16,
+  },
+
+  emptySub: {
+    fontSize: 14,
+    marginTop: 6,
   },
 });

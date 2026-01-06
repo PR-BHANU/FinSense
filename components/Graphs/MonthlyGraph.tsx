@@ -1,7 +1,16 @@
-import React, { useMemo, useEffect, useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useMemo } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Dimensions,
+  useColorScheme,
+} from 'react-native';
 import { LineChart } from 'react-native-gifted-charts';
-import { generateTestExpenses } from '../../scripts/RandomData';
+import LinearGradient from 'react-native-linear-gradient';
+import { LightTheme, DarkTheme } from '../../scripts/theme';
+
+const { width } = Dimensions.get('window');
 
 interface Expense {
   id: string;
@@ -11,148 +20,130 @@ interface Expense {
   date: Date;
 }
 
-interface Props {
+export default function MonthlySpendingGraph({
+  expenses,
+}: {
   expenses: Expense[];
-}
+}) {
+  const scheme = useColorScheme();
+  const theme = scheme === 'dark' ? DarkTheme : LightTheme;
 
-export default function MonthlySpendingGraph({ expenses }: Props) {
-  const [isLoading, setIsLoading] = useState(false);
-
-  useEffect(() => {
-    const seedData = async () => {
-      // if (__DEV__) {
-      //   setIsLoading(true);
-      //   await generateTestExpenses();
-      //   setIsLoading(false);
-      // }
-    };
-    seedData();
-  }, []);
+  const gradientColors =
+    scheme === 'dark' ? [theme.card, theme.background] : ['#ffffff', '#f8fafc'];
 
   const chartData = useMemo(() => {
-    if (!expenses || !expenses.length) return [];
+    if (!expenses?.length) return [];
 
     const monthlyTotals: Record<string, number> = {};
 
     expenses.forEach(exp => {
       const d = new Date(exp.date);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
-        2,
-        '0',
-      )}`;
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
       monthlyTotals[key] = (monthlyTotals[key] || 0) + exp.amount;
     });
 
-    const sortedData = Object.entries(monthlyTotals)
-      .map(([key, total]) => {
-        const [year, monthNum] = key.split('-').map(Number);
-        const monthName = new Date(year, monthNum - 1).toLocaleString(
-          'default',
-          {
-            month: 'short',
-          },
-        );
-
+    return Object.entries(monthlyTotals)
+      .map(([key, value]) => {
+        const [year, month] = key.split('-').map(Number);
         return {
-          label: monthName,
-          value: total,
-          year,
-          monthIndex: monthNum - 1,
+          value,
+          label: new Date(year, month).toLocaleString('default', {
+            month: 'short',
+          }),
+          dataPointText: `₹${value.toLocaleString()}`,
         };
       })
-      .sort((a, b) => {
-        if (a.year === b.year) return a.monthIndex - b.monthIndex;
-        return a.year - b.year;
-      });
-
-    return sortedData
-      .map(item => ({
-        value: item.value,
-        label: item.label,
-        dataPointText: `₹${item.value.toLocaleString()}`,
-        dataPointColor: '#2563eb',
-      }))
+      .sort((a, b) => a.label.localeCompare(b.label))
       .slice(-6);
   }, [expenses]);
 
-  if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Seeding test data...</Text>
-      </View>
-    );
-  }
-
   if (!chartData.length) {
     return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>Not enough data to show trend 💤</Text>
+      <View style={styles.emptyWrap}>
+        <Text style={[styles.emptyTitle, { color: theme.text }]}>
+          No trend data yet
+        </Text>
+        <Text style={[styles.emptySub, { color: theme.subText }]}>
+          Track expenses to see monthly insights
+        </Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.card}>
-      <Text style={styles.title}>Monthly Spending Trend</Text>
+    <LinearGradient
+      colors={gradientColors}
+      style={[styles.card, { backgroundColor: theme.card }]}
+    >
+      <Text style={[styles.title, { color: theme.text }]}>
+        Monthly Spending Trend
+      </Text>
+
       <LineChart
         data={chartData}
         curved
         thickness={3}
-        color="#1472bfff"
-        showDataPoints
-        dataPointsHeight={6}
-        dataPointsWidth={6}
+        color={theme.primary}
+        areaChart
+        startFillColor={theme.primary}
+        endFillColor={theme.primary}
+        startOpacity={0.25}
+        endOpacity={0.05}
         hideRules
         hideYAxisText
-        areaChart
-        startFillColor="#1472bfff"
-        endFillColor="#93c5fd"
-        startOpacity={0.4}
-        endOpacity={0.1}
-        yAxisColor="transparent"
         xAxisColor="transparent"
-        xAxisLabelTextStyle={{ color: '#475569', fontSize: 12 }}
+        yAxisColor="transparent"
+        showDataPoints
+        dataPointsColor={theme.primary}
+        dataPointsHeight={6}
+        dataPointsWidth={6}
+        xAxisLabelTextStyle={{
+          color: theme.subText,
+          fontSize: 12,
+          fontWeight: '600',
+        }}
+        spacing={width / 7}
+        initialSpacing={20}
         noOfSections={4}
         animateOnDataChange
+        animationDuration={700}
       />
-    </View>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#fff', // 💠 Light blue background
-    borderRadius: 16,
-    marginHorizontal: 16,
-    marginVertical: 14,
-    padding: 20,
-    elevation: 4,
+    width: 325,
+    borderRadius: 24,
+    padding: 22,
+    marginVertical: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
   },
+
   title: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#0f172a',
     marginBottom: 16,
+    letterSpacing: 0.3,
   },
-  loadingContainer: {
+
+  emptyWrap: {
     alignItems: 'center',
-    paddingVertical: 40,
+    paddingVertical: 48,
   },
-  loadingText: {
-    color: '#2563eb',
-    fontSize: 15,
-    fontWeight: '600',
+
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
   },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingVertical: 30,
-  },
-  emptyText: {
-    color: '#334155',
+
+  emptySub: {
     fontSize: 14,
+    marginTop: 6,
   },
 });

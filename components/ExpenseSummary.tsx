@@ -5,11 +5,13 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
+  useColorScheme,
 } from 'react-native';
 import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
 import LinearGradient from 'react-native-linear-gradient';
 import { ArrowRight } from 'lucide-react-native';
+import { LightTheme, DarkTheme } from '../scripts/theme';
 
 interface Expense {
   id: string;
@@ -38,6 +40,8 @@ export default function ExpenseSummaryCard({ navigation }: any) {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastMonthExpenses, setLastMonthExpenses] = useState<Expense[]>([]);
+  const scheme = useColorScheme();
+  const theme = scheme === 'dark' ? DarkTheme : LightTheme;
 
   const now = new Date();
   const currentMonth = months[now.getMonth()];
@@ -58,7 +62,7 @@ export default function ExpenseSummaryCard({ navigation }: any) {
       .where('date', '<=', endOfMonth)
       .orderBy('date', 'desc')
       .onSnapshot(snapshot => {
-        const data: Expense[] = snapshot.docs.map(doc => {
+        const data = snapshot.docs.map(doc => {
           const d = doc.data();
           return {
             id: doc.id,
@@ -87,7 +91,7 @@ export default function ExpenseSummaryCard({ navigation }: any) {
       .where('date', '<=', endOfLastMonth)
       .orderBy('date', 'desc')
       .onSnapshot(snapshot => {
-        const data: Expense[] = snapshot.docs.map(doc => {
+        const data = snapshot.docs.map(doc => {
           const d = doc.data();
           return {
             id: doc.id,
@@ -98,62 +102,47 @@ export default function ExpenseSummaryCard({ navigation }: any) {
           };
         });
         setLastMonthExpenses(data);
-        setLoading(false);
       });
 
     return () => unsubscribe();
   }, []);
 
-  // ✅ Define computed variables BEFORE conditional UI
-  const total = expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+  const total = expenses.reduce((sum, e) => sum + e.amount, 0);
   const totals: Record<string, number> = {};
   expenses.forEach(e => {
     const cat = e.category || 'Miscellaneous';
     totals[cat] = (totals[cat] || 0) + e.amount;
   });
-  const totalAmount = Object.values(totals).reduce((a, b) => a + b, 0);
   const entries = Object.entries(totals);
   const topCategory = entries.length
     ? entries.reduce((max, curr) => (curr[1] > max[1] ? curr : max))
     : ['Miscellaneous', 0];
   const topCategoryPercentage =
-    totalAmount > 0 ? ((topCategory[1] / totalAmount) * 100).toFixed(1) : '0';
+    total > 0 ? ((topCategory[1] / total) * 100).toFixed(1) : '0';
 
-  //total amount for last month
-  let totalAmountLastMonth = 0;
-  lastMonthExpenses.forEach(e => {
-    totalAmountLastMonth += e.amount || 0;
-  });
-  useEffect(() => {
-    const user = auth().currentUser;
-    if (!user || !topCategory || !Array.isArray(topCategory)) return;
+  let lastTotal = 0;
+  lastMonthExpenses.forEach(e => (lastTotal += e.amount));
 
-    firestore()
-      .collection('Users')
-      .doc(user.uid)
-      .update({
-        preferredCategory: topCategory[0],
-      })
-      .catch(err => console.error('Error updating category:', err));
-  }, [topCategoryPercentage]);
-
-  // ✅ Now we can safely return based on state
-  if (loading)
+  if (loading) {
     return (
-      <View style={styles.loadingCard}>
-        <ActivityIndicator color="#2563eb" />
-        <Text style={{ color: '#64748b', marginTop: 8 }}>
-          Loading summary...
+      <View style={[styles.loadingCard, { backgroundColor: theme.inputBg }]}>
+        <ActivityIndicator color={theme.primary} />
+        <Text style={{ color: theme.subText, marginTop: 8 }}>
+          Loading summary…
         </Text>
       </View>
     );
+  }
 
   if (!expenses.length) {
     return (
       <TouchableOpacity onPress={() => navigation.navigate('Add-Expense')}>
-        <View style={styles.loadingCard}>
-          <Text style={{ color: '#64748b', fontSize: 16 }}>
-            No expenses yet this month 💸. Click on me to add Expenses.
+        <View style={[styles.loadingCard, { backgroundColor: theme.inputBg }]}>
+          <Text
+            style={{ color: theme.subText, fontSize: 15, textAlign: 'center' }}
+          >
+            No expenses yet this month 💸
+            {'\n'}Tap to add your first one
           </Text>
         </View>
       </TouchableOpacity>
@@ -162,7 +151,12 @@ export default function ExpenseSummaryCard({ navigation }: any) {
 
   return (
     <TouchableOpacity onPress={() => navigation.navigate('Show-Expense')}>
-      <LinearGradient colors={['#2563eb', '#1e40af']} style={styles.card}>
+      <LinearGradient
+        colors={
+          scheme === 'dark' ? ['#1E3A8A', '#1E40AF'] : ['#4A6CF7', '#365DF0']
+        }
+        style={styles.card}
+      >
         <View style={styles.header}>
           <Text style={styles.monthText}>{currentMonth}'s Spending</Text>
           <ArrowRight size={18} color="#fff" />
@@ -171,16 +165,16 @@ export default function ExpenseSummaryCard({ navigation }: any) {
         <Text style={styles.totalAmount}>₹{total.toLocaleString()}</Text>
 
         <Text style={styles.insightText}>
-          You spent most on{' '}
+          Mostly spent on{' '}
           <Text style={styles.categoryHighlight}>{topCategory[0]}</Text> (
           <Text style={styles.amountHighlight}>
             ₹{topCategory[1].toLocaleString()}
           </Text>
-          ) — <Text style={styles.percentage}>{topCategoryPercentage}%</Text> of
-          your spending this month.
+          ) — <Text style={styles.percentage}>{topCategoryPercentage}%</Text>
         </Text>
-        <Text style={styles.InsightsSpending}>
-          {generateInsight(totalAmount, totalAmountLastMonth, topCategory)}{' '}
+
+        <Text style={styles.insightSecondary}>
+          {generateInsight(total, lastTotal, topCategory[0])}
         </Text>
       </LinearGradient>
     </TouchableOpacity>
@@ -193,22 +187,12 @@ const styles = StyleSheet.create({
     padding: 20,
     marginHorizontal: 16,
     marginVertical: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
   },
   loadingCard: {
-    backgroundColor: '#fff',
     borderRadius: 16,
     padding: 20,
     margin: 16,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
   },
   header: {
     flexDirection: 'row',
@@ -216,67 +200,50 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   monthText: {
-    color: '#e0e7ff',
-    fontSize: 16,
+    color: '#E0E7FF',
+    fontSize: 15,
     fontWeight: '600',
   },
   totalAmount: {
     fontSize: 34,
     fontWeight: '800',
-    color: '#fff',
-    marginTop: 8,
+    color: '#FFFFFF',
+    marginTop: 10,
   },
   insightText: {
     fontSize: 15,
     lineHeight: 22,
-    color: '#e2e8f0',
+    color: '#E5EDFF',
     marginTop: 12,
   },
   categoryHighlight: {
-    color: '#fde68a',
+    color: '#FEF08A',
     fontWeight: '700',
   },
   amountHighlight: {
-    color: '#facc15',
+    color: '#FDE047',
     fontWeight: '600',
   },
   percentage: {
-    color: '#93c5fd',
+    color: '#BFDBFE',
     fontWeight: '600',
   },
-  InsightsSpending: {
-    paddingTop: 5,
-    color: '#f1f5f9',
-    fontSize: 15,
+  insightSecondary: {
     marginTop: 8,
-    fontStyle: 'italic',
+    fontSize: 14,
+    color: '#E5EDFF',
     opacity: 0.9,
+    fontStyle: 'italic',
   },
 });
 
-const generateInsight = (current, last, topCategory) => {
-  if (last === 0) return 'No past data — this month’s your fresh start! 🌱';
+const generateInsight = (current, last, category) => {
+  if (last === 0) return 'Fresh month, fresh habits 🌱';
 
   const diff = current - last;
   const pct = ((Math.abs(diff) / last) * 100).toFixed(1);
 
-  if (diff > 0) {
-    const messages = [
-      `🤑 Spent ${pct}% more than last month — ${topCategory} strikes again!`,
-      `🍕 ${topCategory} took the top spot again — ${pct}% higher than before.`,
-      `💸 Easy there! ${pct}% more than last month. Inflation or indulgence?`,
-      `⚡ You’re on a roll... a *spending* roll. +${pct}% vs last month.`,
-    ];
-    return messages[Math.floor(Math.random() * messages.length)];
-  } else if (diff < 0) {
-    const messages = [
-      `🧘 Budget monk mode activated — you saved ${pct}% this month.`,
-      `💪 You spent less this time. ${pct}% down. Hanuman discipline unlocked.`,
-      `🌱 Growth mindset in action: ${pct}% less than last month.`,
-      `🔥 You’re evolving — ${pct}% less spending this month. Keep it up!`,
-    ];
-    return messages[Math.floor(Math.random() * messages.length)];
-  } else {
-    return '📊 Steady as a rock — same spending as last month.';
-  }
+  if (diff > 0) return `You spent ${pct}% more than last month on ${category}.`;
+  if (diff < 0) return `Great job! Spending reduced by ${pct}% this month.`;
+  return 'Spending stayed exactly the same as last month.';
 };

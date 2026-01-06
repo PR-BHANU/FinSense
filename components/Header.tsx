@@ -1,40 +1,46 @@
 import { Settings } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { View, Text, Image, Pressable, StyleSheet } from 'react-native';
+import {
+  View,
+  Text,
+  Image,
+  Pressable,
+  StyleSheet,
+  useColorScheme,
+} from 'react-native';
+import { BlurView } from '@react-native-community/blur';
 import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { LightTheme, DarkTheme } from '../scripts/theme';
+import { StatusBar, Platform } from 'react-native';
 
-type HeaderProps = {
-  profilePic: string | null;
-  navigation: any;
-};
-
-type UserData = {
-  name?: string;
-};
-
-export default function Header({ profilePic, navigation }: HeaderProps) {
-  const [user, setUser] = useState<UserData | null>(null);
+const STATUS_BAR_HEIGHT =
+  Platform.OS === 'android' ? StatusBar.currentHeight ?? 0 : 0;
+export default function Header({ profilePic, navigation }) {
+  const [user, setUser] = useState<any>(null);
+  const scheme = useColorScheme();
+  const theme = scheme === 'dark' ? DarkTheme : LightTheme;
   const authUser = auth().currentUser;
 
   useEffect(() => {
     if (!authUser) return;
-
-    const unsubscribe = firestore()
+    return firestore()
       .collection('users')
       .doc(authUser.uid)
-      .onSnapshot(doc => {
-        if (doc.exists) {
-          setUser(doc.data() as UserData);
-        }
-      });
-
-    return unsubscribe;
+      .onSnapshot(doc => doc.exists && setUser(doc.data()));
   }, [authUser]);
 
   return (
-    <SafeAreaView edges={['top']} style={styles.safe}>
+    <View style={styles.wrapper}>
+      <BlurView
+        style={StyleSheet.absoluteFill}
+        blurType={scheme === 'dark' ? 'dark' : 'light'}
+        blurAmount={Platform.OS === 'ios' ? 40 : 14}
+        reducedTransparencyFallbackColor={
+          scheme === 'dark' ? 'rgba(12,12,12,0.25)' : 'rgba(255,255,255,0.35)'
+        }
+      />
+
       <View style={styles.container}>
         <View style={styles.left}>
           <Image
@@ -47,78 +53,76 @@ export default function Header({ profilePic, navigation }: HeaderProps) {
           />
 
           <View style={styles.textContainer}>
-            <Text style={styles.greeting}>
-              Good Morning
-              {user?.name
-                ? `, ${user.name}`
-                : authUser?.displayName
-                ? `, ${authUser.displayName}`
-                : ''}{' '}
-              👋
+            <Text style={[styles.greeting, { color: theme.text }]}>
+              Good Morning{user?.name ? `, ${user.name}` : ''} 👋
             </Text>
-
-            <Text style={styles.subtitle}>Your Smart Finance Partner</Text>
+            <Text style={[styles.subtitle, { color: theme.subText }]}>
+              Your Smart Finance Partner
+            </Text>
           </View>
         </View>
 
         <Pressable
-          style={styles.settingsBtn}
           onPress={() => navigation.navigate('Settings')}
+          style={[
+            styles.settingsBtn,
+            {
+              backgroundColor:
+                scheme === 'dark'
+                  ? 'rgba(255,255,255,0.18)'
+                  : 'rgba(0,0,0,0.12)',
+            },
+          ]}
         >
-          <Settings size={22} color="#000" />
+          <Settings size={22} color={theme.text} />
         </Pressable>
       </View>
-    </SafeAreaView>
+    </View>
   );
-}
-function settingsPress(navigation) {
-  navigation.navigate('Settings');
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    backgroundColor: '#fff',
+  wrapper: {
+    paddingTop: 14,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 90,
+    overflow: 'hidden',
+    zIndex: 100,
   },
-
   container: {
+    height: 78,
     paddingHorizontal: 16,
-    paddingBottom: 16,
-    paddingTop: 8,
+    paddingTop: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-
   left: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
-
   profilePic: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#e5e5e5',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
   },
-
   textContainer: {
     marginLeft: 12,
   },
-
   greeting: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#000',
   },
-
   subtitle: {
     fontSize: 13,
-    color: '#777',
     marginTop: 4,
   },
-
   settingsBtn: {
-    padding: 8,
+    padding: 10,
+    borderRadius: 12,
   },
 });

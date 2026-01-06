@@ -6,15 +6,18 @@ import {
   StyleSheet,
   ScrollView,
   Platform,
+  useColorScheme,
 } from 'react-native';
 import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
 import { useNavigation } from '@react-navigation/native';
-import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+import { LightTheme, DarkTheme } from '../scripts/theme';
 
 export default function RecentExpensesHorizontal() {
   const navigation = useNavigation();
   const [recent, setRecent] = useState<any[]>([]);
+  const scheme = useColorScheme();
+  const theme = scheme === 'dark' ? DarkTheme : LightTheme;
 
   useEffect(() => {
     const user = auth().currentUser;
@@ -50,11 +53,15 @@ export default function RecentExpensesHorizontal() {
   const cardSpacing = 14;
 
   return (
-    <View style={styles.wrapper /* ensures overflow visible */}>
+    <View style={styles.wrapper}>
       <View style={styles.headerRow}>
-        <Text style={styles.heading}>Recent Expenses</Text>
+        <Text style={[styles.heading, { color: theme.text }]}>
+          Recent Expenses
+        </Text>
         <TouchableOpacity onPress={() => navigation.navigate('Show-Expense')}>
-          <Text style={styles.viewAll}>View All →</Text>
+          <Text style={[styles.viewAll, { color: theme.primary }]}>
+            View All →
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -78,19 +85,48 @@ export default function RecentExpensesHorizontal() {
                 key={item.id}
                 style={[
                   styles.card,
-                  { marginRight: isLast ? outerPadding : cardSpacing },
+                  {
+                    marginRight: isLast ? outerPadding : cardSpacing,
+                    backgroundColor: theme.inputBg,
+                    borderColor: theme.border,
+                  },
                 ]}
                 onPress={() => navigation.navigate('Show-Expense')}
                 activeOpacity={0.9}
               >
-                <Text style={styles.amount}>₹{item.amount}</Text>
-                <Text numberOfLines={1} style={styles.title}>
+                <Text style={[styles.amount, { color: '#DC2626' }]}>
+                  ₹{item.amount}
+                </Text>
+
+                <Text
+                  numberOfLines={1}
+                  style={[styles.title, { color: theme.text }]}
+                >
                   {item.title}
                 </Text>
-                <View style={styles.categoryChip}>
-                  <Text style={styles.categoryText}>{item.category}</Text>
+
+                <View
+                  style={[
+                    styles.categoryChip,
+                    {
+                      backgroundColor:
+                        scheme === 'dark' ? '#1E3A8A' : '#E0F2FE',
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.categoryText,
+                      {
+                        color: scheme === 'dark' ? '#BFDBFE' : '#0284C7',
+                      },
+                    ]}
+                  >
+                    {item.category}
+                  </Text>
                 </View>
-                <Text style={styles.date}>
+
+                <Text style={[styles.date, { color: theme.subText }]}>
                   {item.date.toLocaleDateString('en-IN', {
                     day: '2-digit',
                     month: 'short',
@@ -108,7 +144,6 @@ export default function RecentExpensesHorizontal() {
 const styles = StyleSheet.create({
   wrapper: {
     marginTop: 20,
-    paddingHorizontal: 0,
     overflow: Platform.OS === 'android' ? 'visible' : 'visible',
   },
 
@@ -119,49 +154,44 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
   },
+
   heading: {
     fontSize: 20,
-    fontWeight: '800',
-    color: '#0f172a',
-  },
-  viewAll: {
-    color: '#2563eb',
     fontWeight: '700',
+  },
+
+  viewAll: {
+    fontWeight: '600',
     fontSize: 14,
   },
 
   card: {
     width: 150,
     height: 150,
-    backgroundColor: '#fff',
     borderRadius: 18,
     padding: 14,
+    borderWidth: 1,
     shadowColor: '#000',
     shadowOpacity: 0.08,
     shadowOffset: { width: 0, height: 6 },
     shadowRadius: 10,
     elevation: 4,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
   },
 
   amount: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#dc2626',
     marginBottom: 8,
   },
 
   title: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#0f172a',
     marginBottom: 6,
   },
 
   categoryChip: {
     alignSelf: 'flex-start',
-    backgroundColor: '#e0f2fe',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
@@ -170,13 +200,11 @@ const styles = StyleSheet.create({
 
   categoryText: {
     fontSize: 12,
-    color: '#0284c7',
     fontWeight: '600',
   },
 
   date: {
     marginTop: 4,
     fontSize: 12,
-    color: '#64748b',
   },
 });

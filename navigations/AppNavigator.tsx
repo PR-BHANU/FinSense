@@ -16,7 +16,7 @@ const Stack = createNativeStackNavigator();
 export default function AppNavigator() {
   return (
     <Stack.Navigator
-      initialRouteName="Get-Started"
+      initialRouteName="AuthLoading"
       screenOptions={{
         headerShown: false,
       }}
